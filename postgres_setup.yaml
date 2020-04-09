@@ -1,0 +1,30 @@
+---
+-
+  become: true
+  hosts: db_hosts
+  environment:
+      PGPASSFILE: /var/lib/pgsql/.pgpass
+  tasks:
+    -
+      import_tasks: pg_install.yaml
+      name: "install postgreSQL software"
+      when: inventory_hostname in groups['db_hosts']
+      #      when: "groups[\"db_hosts\"]|length>0"
+    -
+      import_tasks: pg_master_setup.yaml
+      name: "Configure master node"
+      when: inventory_hostname in groups['master_hosts']
+      #      when: "groups[\"master_hosts\"]|length>0"
+    -
+      import_tasks: pg_slave_setup.yaml
+      name: "Configure slave nodes"
+      when: inventory_hostname in groups['slave_hosts']
+      #      when: "groups[\"slave_hosts\"]|length>0"
+    -
+      name: "Status of replication from master node"
+      when: inventory_hostname in groups['master_hosts']
+      become: true
+      become_user: postgres
+      become_method: su
+      command: psql -c "select * from pg_stat_replication;"
+

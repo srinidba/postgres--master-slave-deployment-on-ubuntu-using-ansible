@@ -1,0 +1,115 @@
+--- 
+#- 
+  #become: true
+  #hosts: db_hosts
+  #tasks: 
+    - 
+      copy: 
+        content: "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main"
+        dest: /etc/apt/sources.list.d/pgdg.list
+      name: "Configure the Postgres repo"
+    - 
+      apt_key: 
+        state: present
+        url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+      name: "Import the repository signing key and update the package lists"
+    - 
+      apt: 
+        update_cache: true
+      name: "ensure apt cache is up to date"
+    - 
+      apt: 
+        name: postgresql-11
+        state: present
+      name: "Install the core database server"
+    -
+      apt: 
+        name: python3-psycopg2
+        state: present
+      name: "Install the python3-psycopg2"
+    - 
+      file: 
+        group: postgres
+        mode: 493
+        owner: postgres
+        path: /var/lib/postgresql
+        recurse: true
+      name: "Changing files and permissions"
+    - 
+      file: 
+        path: /var/lib/postgresql/11/main
+        state: absent
+      name: "Remove main directory"
+    - 
+      become: true
+      become_method: su
+      become_user: postgres
+      name: "Initialize the database"
+      shell: "/usr/lib/postgresql/11/bin/initdb -k -D /var/lib/postgresql/11/main -X /var/lib/postgresql/pg_wal"
+    - 
+      become: true
+      name: "Start up the PostgreSQL server"
+      service: 
+        name: postgresql
+        state: restarted
+    - 
+      become: true
+      become_method: su
+      become_user: postgres
+      name: "Verify that data page checksums were enabled"
+      shell: "/usr/lib/postgresql/11/bin/pg_controldata /var/lib/postgresql/11/main"
+    - 
+      become: true
+      become_method: su
+      become_user: postgres
+      command: "psql -c \"select version();\""
+      name: "Testing DB version to make sure it is available"
+    - 
+      blockinfile: 
+        block: |
+            host    all             all             0.0.0.0/0               md5
+            host    replication     replication     0.0.0.0/0               md5    
+        path: "{{ item }}" 
+      name: "Modify the pg_hba.conf file to enable remote connections to the database host"
+      with_items:
+        - /var/lib/postgresql/11/main/pg_hba.conf
+        - /etc/postgresql/11/main/pg_hba.conf      
+    - 
+      become: true
+      name: "Restart the PostgreSQL server to take effect of hba.conf changes"
+      service: 
+        name: postgresql
+        state: restarted
+    - 
+      file: 
+        group: postgres
+        mode: 509
+        owner: postgres
+        path: "{{ item }}"
+        recurse: true
+        state: directory
+      name: "create required directories"
+      with_items: 
+        - /stats/error_logs
+        - /backups/wal_archives
+        - /backups/base_backup
+    - 
+      become: true
+      become_method: su
+      become_user: postgres
+      cron: 
+        hour: "5"
+        job: "find /stats/error_logs -maxdepth 1 -type f -mtime +14 -name \"*.log\" -exec rm {} \\;"
+        minute: "0"
+        name: "error purge"
+      name: "Crontab error log purge schedule"
+    - 
+      become: true
+      become_method: su
+      become_user: postgres
+      cron: 
+        hour: "4"
+        job: "find /backups/wal_archives/ -mtime +8 -exec rm {} \\;"
+        minute: "0"
+        name: "WAL purge"
+      name: "Crontab WAL files purge schedule"

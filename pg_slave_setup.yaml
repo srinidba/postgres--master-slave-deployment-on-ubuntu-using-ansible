@@ -1,0 +1,63 @@
+--- 
+#- 
+#  become: true
+#  environment: 
+#    PGPASSFILE: /var/lib/pgsql/.pgpass
+#  hosts: slave_hosts
+#  tasks: 
+    - 
+      become: true
+      name: "Stop the postgreSQL Service"
+      service: 
+        name: postgresql
+        state: stopped
+    - 
+      file: 
+        path: /var/lib/postgresql/11/main
+        state: absent
+      name: "Remove the data directory before restore from primary"
+    - 
+      become: true
+      blockinfile:
+        block: |-
+            # hostname:port:database:username:password
+            {% for host in groups['db_hosts'] %}
+            {{ hostvars[host]['ansible_default_ipv4']['address'] + ':*:*:replication:NPu2HW1j9BcryBTglNlt' }}
+            {% endfor %}
+        create: true
+        group: postgres
+        mode: 384
+        owner: postgres
+        path: /var/lib/pgsql/.pgpass
+      name: "pgpass for non interactive logins to the other node"
+    - 
+      become: true
+      become_user: postgres
+      command: |
+          {% for master in groups['master_hosts'] %}
+          pg_basebackup -h {{master}} -D /var/lib/postgresql/11/main -P -v -U replication -R --wal-method=stream
+          {% endfor %}
+      name: "Perform restore from master node"
+    - 
+      blockinfile: 
+        block: |
+            restore_command = 'unxz < /backups/wal_archives/%f >"%p"'
+            recovery_target_timeline = 'latest'
+        path: /var/lib/postgresql/11/main/recovery.conf
+      name: "Modify the recovery.conf"
+    - 
+      become: true
+      name: "Restart the PostgreSQL server"
+      service: 
+        name: postgresql
+        state: restarted
+        #-
+        #  become: true
+        #  hosts: master_hosts
+        #  tasks:
+        #    -
+        #      become: true
+        #      become_user: postgres
+        #      become_method: su
+        #      command: psql -c "select * from pg_stat_replication;" -x
+        #      name: "Check the replication status"        

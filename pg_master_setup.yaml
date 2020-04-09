@@ -1,0 +1,264 @@
+--- 
+#- 
+# become: true
+# environment: 
+#    PGPASSFILE: /var/lib/pgsql/.pgpass
+#  hosts: master_hosts
+# tasks: 
+    - 
+      become: true
+      become_user: postgres
+      name: "Listen Address"
+      postgresql_set: 
+        name: listen_addresses
+        value: "*"
+    - 
+      become: true
+      become_user: postgres
+      name: "max connections"
+      postgresql_set: 
+        name: max_connections
+        value: "500"
+    - 
+      become: true
+      become_user: postgres
+      name: "max prepared transactions"
+      postgresql_set: 
+        name: max_prepared_transactions
+        value: "500"
+    - 
+      become: true
+      become_user: postgres
+      name: "checkpoint timeout"
+      postgresql_set: 
+        name: checkpoint_timeout
+        value: 30min
+    - 
+      become: true
+      become_user: postgres
+      name: "wal level"
+      postgresql_set: 
+        name: wal_level
+        value: logical
+    - 
+      become: true
+      become_user: postgres
+      name: fsync
+      postgresql_set: 
+        name: fsync
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "archive mode"
+      postgresql_set: 
+        name: archive_mode
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "max wal senders"
+      postgresql_set: 
+        name: max_wal_senders
+        value: "10"
+    - 
+      become: true
+      become_user: postgres
+      name: "archive timeout"
+      postgresql_set: 
+        name: archive_timeout
+        value: "0"
+    - 
+      become: true
+      become_user: postgres
+      name: "wal keep segments"
+      postgresql_set: 
+        name: wal_keep_segments
+        value: "512"
+    - 
+      become: true
+      become_user: postgres
+      name: "wal sender timeout"
+      postgresql_set: 
+        name: wal_sender_timeout
+        value: "0"
+    - 
+      become: true
+      become_user: postgres
+      name: shared_preload_libraries
+      postgresql_set: 
+        name: shared_preload_libraries
+        value: 16MB
+    - 
+      become: true
+      become_user: postgres
+      name: "hot standby"
+      postgresql_set: 
+        name: hot_standby
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "max wal size"
+      postgresql_set: 
+        name: max_wal_size
+        value: 20GB
+    - 
+      become: true
+      become_user: postgres
+      name: "wal compression"
+      postgresql_set: 
+        name: wal_compression
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "archive command"
+      postgresql_set: 
+        name: archive_command
+        value: "xz -2 < %p > /backups/wal_archives/%f"
+    - 
+      become: true
+      become_user: postgres
+      name: "full page writes"
+      postgresql_set: 
+        name: full_page_writes
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "logging collector"
+      postgresql_set: 
+        name: logging_collector
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "log directory"
+      postgresql_set: 
+        name: log_directory
+        value: /stats/error_logs
+    - 
+      become: true
+      become_user: postgres
+      name: "log filename"
+      postgresql_set: 
+        name: log_filename
+        value: postgresql-%Y-%m-%d_%H%M%S.log
+    - 
+      become: true
+      become_user: postgres
+      name: "log line prefix"
+      postgresql_set: 
+        name: log_line_prefix
+        value: "%t [%p]: [%l-1] host=%h, user=%u, db=%d"
+    - 
+      become: true
+      become_user: postgres
+      name: "log min duration statement"
+      postgresql_set: 
+        name: log_min_duration_statement
+        value: 10s
+    - 
+      become: true
+      become_user: postgres
+      name: "log checkpoints"
+      postgresql_set: 
+        name: log_checkpoints
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "log connections"
+      postgresql_set: 
+        name: log_connections
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "log disconnections"
+      postgresql_set: 
+        name: log_disconnections
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "log lock waits"
+      postgresql_set: 
+        name: log_lock_waits
+        value: "on"
+    - 
+      become: true
+      become_user: postgres
+      name: "log temp files"
+      postgresql_set: 
+        name: log_temp_files
+        value: "0"
+    - 
+      become: true
+      become_user: postgres
+      name: "log autovacuum min duration"
+      postgresql_set: 
+        name: log_autovacuum_min_duration
+        value: "0"
+    - 
+      become: true
+      become_user: postgres
+      name: "shared preload libraries"
+      postgresql_set: 
+        name: shared_preload_libraries
+        value: pg_stat_statements
+    - 
+      become: true
+      become_user: postgres
+      command: "psql -c \"create extension pg_stat_statements;\""
+      name: " Extension pg stat statements"
+    - 
+      become: true
+      name: "Restart the PostgreSQL server to take effect changes"
+      service: 
+        name: postgresql
+        state: restarted
+    - 
+      become: true
+      become_user: postgres
+      name: "Create replication user, grant privs"
+      postgresql_user: 
+        db: postgres
+        name: replication
+        password: NPu2HW1j9BcryBTglNlt
+        priv: ALL
+        role_attr_flags: REPLICATION
+        #- 
+        #  become: true
+        #  hosts: db_hosts
+        #  tasks: 
+    - 
+      become: true
+      blockinfile: 
+        block: |-
+            # hostname:port:database:username:password
+            {% for host in groups['db_hosts'] %}
+            {{ hostvars[host]['ansible_default_ipv4']['address'] + ':*:*:replication:NPu2HW1j9BcryBTglNlt' }}
+            {% endfor %}
+        create: true
+        group: postgres
+        mode: 384
+        owner: postgres
+        path: /var/lib/pgsql/.pgpass
+      name: "pgpass for non interactive logins to the other node"
+      #- 
+      #  become: true
+      #  environment: 
+      #    PGPASSFILE: /var/lib/pgsql/.pgpass
+      #  hosts: db_hosts
+      #  tasks: 
+    - 
+      become: true
+      become_user: postgres
+      command: |
+          {% for master in groups['master_hosts'] %}
+          pg_basebackup -h {{master}} -U replication --format=tar -z -v -D /backups/base_backup
+          {% endfor %}
+      name: "Test the pg_basebackup to ensure the .pgpass file is working"
+
