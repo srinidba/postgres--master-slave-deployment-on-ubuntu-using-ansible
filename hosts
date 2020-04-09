@@ -1,10 +1,10 @@
 [db_hosts]
-10.18.84.171
-10.18.84.19
+host1
+host2
 
 [master_hosts]
-10.18.84.171
+host1
 
 [slave_hosts]
-10.18.84.19
+host2
 
